@@ -5,33 +5,51 @@ class House
 
 end
 
-def parse_puzzle_constraints
-  position_words_arr = ['first', 'middle']
-  nationality_words_arr = 
-    ['norweigian', 'ukrainian', 'englishman', 'spaniard', 'japanese']
-
-  key_words_hash = 
-  puzzle_constraints = []
-  File.open('puzzle_constraints.txt').each_line do |line|
-    puzzle_constraints << line.chomp
+class Solution
+  def initialize
+    @houses = {}
+    5.times do |idx|
+      @houses[idx] = House.new 
+    end
   end
 
-  puzzle_constraints.each do |line|
+  def render_solution
+    @houses.each_value do |house|
+      p house
+    end
+  end
+
+  def parse_puzzle_constraints
+    position_words_arr = ['first', 'middle', 'right', 'next']
+    nationality_words_arr = 
+    ['norweigian', 'ukrainian', 'englishman', 'spaniard', 'japanese']
+    drink_words_arr = ['tea', 'milk', 'orange', 'coffee']
+    smoke_words_arr = 
+    ['kools', 'chesterfield', 'old gold', 'lucky', 'parliament']
+    pet_words_arr = ['fox', 'horse', 'snails', 'dog']
+
+    key_words_hash = Hash.new(false)
+
+    [position_words_arr, nationality_words_arr, drink_words_arr, smoke_words_arr, pet_words_arr].each do |array|
+
+      array.each do |word|
+        key_words_hash[word] = true
+      end
+    end
+
+    
+    p key_words_hash
+
+    File.open('puzzle_constraints.txt').each_line do |line|
+
+    end
 
   end
 end
 
 
-
-h = House.new
-h.color = :red
-
-h.drink = :milk
-h.smoke = :lucky_strike
-h.pet = :zebra
-h.nationality = :englishman
-p h
-
-parse_puzzle_constraints
+s = Solution.new
+s.parse_puzzle_constraints
+s.render_solution
 
 #script to run algorithm
