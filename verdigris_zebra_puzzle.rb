@@ -1,5 +1,28 @@
 #! /usr/bin/env ruby
 
+def create_keywords_hash
+  position_words_arr = ['first', 'middle', 'right', 'next']
+  color_words_arr = ['yellow', 'blue', 'red', 'ivory', 'green']
+  nationality_words_arr = 
+  ['norwegian', 'ukrainian', 'englishman', 'spaniard', 'japanese']
+  drink_words_arr = ['tea', 'milk', 'orange', 'coffee']
+  smoke_words_arr = 
+  ['kools', 'chesterfields', 'old', 'lucky', 'parliaments']
+  pet_words_arr = ['fox', 'horse', 'snails', 'dog']
+
+  $keywords_hash = Hash.new(false)
+
+  [position_words_arr, color_words_arr, nationality_words_arr, drink_words_arr, smoke_words_arr, pet_words_arr].each_with_index do 
+    |array, idx|
+
+    $attributes = [:number, :color, :nationality, :drink, :smoke, :pet]
+    array.each do |word|
+      $keywords_hash[word] = $attributes[idx]
+    end
+  end
+  $keywords_hash
+end
+
 class House
   attr_accessor :number, :color, :nationality, :drink, :smoke, :pet
   @@houses = []
@@ -16,30 +39,30 @@ class House
     end
     return nil
   end
-end
 
-def create_keywords_hash
-  position_words_arr = ['first', 'middle', 'right', 'next']
-  color_words_arr = ['yellow', 'blue', 'red', 'ivory', 'green']
-  nationality_words_arr = 
-  ['norwegian', 'ukrainian', 'englishman', 'spaniard', 'japanese']
-  drink_words_arr = ['tea', 'milk', 'orange', 'coffee']
-  smoke_words_arr = 
-  ['kools', 'chesterfields', 'old', 'lucky', 'parliaments']
-  pet_words_arr = ['fox', 'horse', 'snails', 'dog']
-
-  $keywords_hash = Hash.new(false)
-
-  [position_words_arr, color_words_arr, nationality_words_arr, drink_words_arr, smoke_words_arr, pet_words_arr].each_with_index do 
-    |array, idx|
-
-    attributes = [:number, :color, :nationality, :drink, :smoke, :pet]
-    array.each do |word|
-      $keywords_hash[word] = attributes[idx]
+  def self.can_merge?(house1, house2)
+    $attributes.each do |el|
+      return false if house1.send(el) && house2.send(el)
     end
+    true
   end
-  $keywords_hash
+
+  def self.merge(house1, house2)
+    new_house = House.new
+    $attributes.each do |attribute|
+      h1_attr = house1.send(attribute)
+      h2_attr = house2.send(attribute)
+      if h1_attr
+        new_house.send(attribute.to_s + "=", h1_attr)
+      elsif h2_attr
+        new_house.send(attribute.to_s + "=", h2_attr)
+      end
+    end
+    new_house
+  end
 end
+
+
 
 class Solution
   def initialize
@@ -77,6 +100,8 @@ class Solution
     end
 
     create_from_simple_relations(simple_relations)
+    create_from_pos_relations(pos_relations)
+    p right_relations, next_relations
 
     [simple_relations, next_relations, right_relations, pos_relations]
   end
@@ -96,6 +121,25 @@ class Solution
     end
   end
 
+  def create_from_pos_relations(pos_relations)
+    pos_relations.each do |key, value|
+      curr_house = House.find(key)
+      unless curr_house
+        curr_house = House.new
+        attribute = $keywords_hash[key].to_s
+        curr_house.send(attribute + "=", key)
+        @houses << curr_house
+      end
+
+      attribute = $keywords_hash[value].to_s
+      if value == "middle"
+        curr_house.send(attribute + "=", 3)
+      elsif value == "first"
+        curr_house.send(attribute + "=", 1)
+      end
+    end
+  end
+
 end
 
 #script to run algorithm
@@ -106,3 +150,6 @@ s = Solution.new
 s.parse_puzzle_constraints
 s.render_solution
 
+
+# work on parsing the next and right relations
+# might have to iterate through random choices to continue with the algorithm
