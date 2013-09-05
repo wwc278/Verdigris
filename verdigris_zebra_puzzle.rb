@@ -105,6 +105,7 @@ class Solution
     @next_relations = {}
     @right_relations = {}
     @pos_relations = {}
+    @no_relations = []
 
     File.open('puzzle_constraints.txt').each_line do |line|
       matched_words = []
@@ -126,6 +127,13 @@ class Solution
 
     end
 
+    # unassociated words in @no_relations
+    $keywords_hash.keys.each do |key|
+      if !@simple_relations[key] && key != "right" && key != "next"
+        @no_relations << key
+      end
+    end
+
     puts "simple_relations: #{@simple_relations}"
     puts ""
     puts "next_relations: #{@next_relations}"
@@ -133,6 +141,8 @@ class Solution
     puts "right_relations: #{@right_relations}"
     puts ""
     puts "pos_relations: #{@pos_relations}"
+    puts ""
+    puts "no_relations: #{@no_relations}"
     puts ""
 
     [@simple_relations, @next_relations, @right_relations, @pos_relations]
@@ -174,7 +184,7 @@ class Solution
   end
 
   def make_deductions
-    4.times do
+    7.times do
       create_from_pos_relations
       place_next_relations
       deduce_colors
@@ -335,7 +345,7 @@ class Solution
         else
           left_house = @final_ordered_houses[r_idx - 1] 
           # return true unless the left house is nil or has the correct color
-          unless left_house.nil? || left_house.color == value
+          if !left_house.color.nil? && left_house.color != value
             return true
           end
         end
@@ -351,7 +361,7 @@ class Solution
         else
           right_house = @final_ordered_houses[l_idx + 1]
           # return true unless the right house is nil or has the correct color
-          unless right_house.nil? || right_house.color == key
+          if !right_house.color.nil? && right_house.color != key
             return true
           end
         end
@@ -371,6 +381,7 @@ class Solution
   end
 
   def deduce_from_singling_and_pairing
+    unknown_attribute_arr = []
     @final_ordered_houses.each do |house|
       next if house.nil?
 
@@ -378,37 +389,94 @@ class Solution
       $attributes.each do |attribute|
         unknown_attributes << attribute if house.send(attribute).nil?
       end
-      
-      p unknown_attributes.length
-      if unknown_attributes.length == 2
-        attr1 = unknown_attributes.first
-        attr2 = unknown_attributes.last
-        pair_attr = find_pair_attributes(attr1, attr2)
-        puts "paired: #{pair_attr}"
-        if pair_attr.length == 2
-          house.send(attr1.to_s + "=", pair_attr.first)
-          house.send(attr2.to_s + "=", pair_attr.last)
+
+      deduce_from_pairs(unknown_attributes, house)
+      deduce_from_singles(unknown_attributes, house)
+
+      unknown_attribute_arr << unknown_attributes
+    end
+
+    p unknown_attribute_arr
+    complex_deduction_with_singles(unknown_attribute_arr)
+  end
+
+  def complex_deduction_with_singles(unknown_attribute_arr)
+    num_of_unknowns_arr = []
+    unknown_attribute_arr.each do |arr|
+      num_of_unknowns_arr << arr.length
+    end
+
+    single_attr_arr = []
+    @no_relations.each do |el|
+      single_attr_arr << el if !House.exist?(el)
+    end
+    p single_attr_arr
+
+    # if only three houses have odd number unknowns and we have three single attributes
+    num_of_unknowns_arr = num_of_unknowns_arr.map {|el| el % 2 == 1}
+    if num_of_unknowns_arr.count(true) == 3 && single_attr_arr.length == 3
+      num_of_unknowns_arr.each_with_index do |el, idx|
+        next unless el # skip if even number of unknowns
+
+        #custom deduction similar to the deduce_* method
+
+        house = @final_ordered_houses[idx]
+        #maps attr to boolean (e.g. yellow => false)
+        unknown_attribute_arr[idx].each do |attribute|
+          attribute = attribute.to_s
+          deduction_hash = {} 
+          
+          single_attr_arr.each do |single_attr|
+            if $keywords_hash[single_attr].to_s == attribute
+              house.send(attribute + "=", single_attr)
+
+              # record if it violates any relations
+              deduction_hash[single_attr] = violates_relations?
+
+              house.send(attribute + "=", nil) # set back to nil
+            end
+
+
+          end
+
+          # check if only one key is false (meaning it is the only one that does not violate relations), if so, set the house attr (e.g. color) to that value
+          if deduction_hash.values.one? {|el| el == false}
+            house.send(attribute + "=", deduction_hash.key(false))
+          end
         end
       end
+    end
 
-      unknown_attributes.each do |un_attr|
-        single_attr = find_single_attribute(un_attr)
-        puts "single: #{single_attr}"
-        if (unknown_attributes.length == 3 || unknown_attributes.length == 1) && single_attr.length == 1
-          house.send(un_attr.to_s + "=", single_attr.first)
-        end
-      end   
+  end
+
+  def deduce_from_pairs(unknown_attributes, house)
+    if unknown_attributes.length == 2
+      attr1 = unknown_attributes.first
+      attr2 = unknown_attributes.last
+      pair_attr = find_pair_attributes(attr1, attr2)
+      # puts "paired: #{pair_attr}"
+      if pair_attr.length == 2
+        house.send(attr1.to_s + "=", pair_attr.first)
+        house.send(attr2.to_s + "=", pair_attr.last)
+      end
+    end
+  end
+
+  def deduce_from_singles(unknown_attributes, house)
+    unknown_attributes.each do |un_attr|
+      single_attr = find_single_attribute(un_attr)
+      # puts "single: #{single_attr}"
+      if (unknown_attributes.length == 3 || unknown_attributes.length == 1) && single_attr.length == 1
+        house.send(un_attr.to_s + "=", single_attr.first)
+      end
     end
   end
 
   def find_single_attribute(attribute)
     results = []
-    @next_relations.each do |key, value|
-      if $keywords_hash[key] == attribute && !House.exist?(key)
-        results << key
-      end
-      if $keywords_hash[value] == attribute && !House.exist?(value)
-        results << value
+    @no_relations.each do |el|
+      if $keywords_hash[el] == attribute && !House.exist?(el)
+        results << el
       end
     end
     results
