@@ -2,31 +2,30 @@
 
 require 'debugger'
 
-def create_keywords_hash
-  $position_words_arr = ['first', 'middle', 'right', 'next']
-  $color_words_arr = ['yellow', 'blue', 'red', 'ivory', 'green']
-  $nationality_words_arr = 
-  ['norwegian', 'ukrainian', 'englishman', 'spaniard', 'japanese']
-  $drink_words_arr = ['tea', 'milk', 'orange', 'coffee']
-  $smoke_words_arr = 
-  ['kools', 'chesterfields', 'old', 'lucky', 'parliaments']
-  $pet_words_arr = ['fox', 'horse', 'snails', 'dog']
+$position_words_arr = ['first', 'middle', 'right', 'next']
+$color_words_arr = ['yellow', 'blue', 'red', 'ivory', 'green']
+$nationality_words_arr = 
+['norwegian', 'ukrainian', 'englishman', 'spaniard', 'japanese']
+$drink_words_arr = ['tea', 'milk', 'orange', 'coffee', 'water']
+$smoke_words_arr = 
+['kools', 'chesterfields', 'old', 'lucky', 'parliaments']
+$pet_words_arr = ['fox', 'horse', 'snails', 'dog', 'zebra']
 
-  $keywords_hash = Hash.new(false)
+$keywords_hash = Hash.new(false)
 
-  [$position_words_arr, $color_words_arr, $nationality_words_arr, $drink_words_arr, $smoke_words_arr, $pet_words_arr].each_with_index do 
-    |array, idx|
+[$position_words_arr, $color_words_arr, $nationality_words_arr, $drink_words_arr, $smoke_words_arr, $pet_words_arr].each_with_index do 
+  |array, idx|
 
-    $attributes = [:number, :color, :nationality, :drink, :smoke, :pet]
-    array.each do |word|
-      $keywords_hash[word] = $attributes[idx]
-    end
+  $attributes = [:position, :color, :nationality, :drink, :smoke, :pet]
+  array.each do |word|
+    $keywords_hash[word] = $attributes[idx]
   end
-  $keywords_hash
 end
+$keywords_hash
+
 
 class House
-  attr_accessor :number, :color, :nationality, :drink, :smoke, :pet
+  attr_accessor :position, :color, :nationality, :drink, :smoke, :pet
   @@houses = []
 
   def initialize
@@ -170,10 +169,15 @@ class Solution
   end
 
   def make_deductions
-    create_from_pos_relations
-    place_next_relations
-    deduce_color
-    deduce_from_simple_relations
+    2.times do
+      create_from_pos_relations
+      place_next_relations
+      deduce_colors
+      deduce_from_simple_relations
+      deduce_drinks
+      deduce_smokes
+    end
+    deduce_from_pairing
   end
 
   def place_next_relations
@@ -182,53 +186,98 @@ class Solution
       curr_house = House.find(key) if House.exist?(key)
 
       if curr_house
-        new_house = House.new
         attribute = $keywords_hash[value].to_s
 
-        if curr_house.number == "first"
-          new_house.number = "second"
-          new_house.send(attribute + "=", value)
-          @final_ordered_houses[1] = new_house
-        elsif curr_house.number == "last"
-          new_house.number = "fourth"
-          new_house.send(attribute + "=", value)
-          @final_ordered_houses[3] = new_house
+        if curr_house.position == "first"
+          second_house = @final_ordered_houses[1] || House.new
+          second_house.position = "second" unless second_house.position
+          second_house.send(attribute + "=", value)
+          @final_ordered_houses[1] = second_house
+
+        elsif curr_house.position == "last"
+          fourth_house = @final_ordered_houses[3] || House.new
+          fourth_house.position = "fourth" unless fourth_house.position
+          fourth_house.send(attribute + "=", value)
+          @final_ordered_houses[3] = fourth_house
         end
 
       end
     end
   end
 
-  def available_colors
-    avail_colors = []
-    $color_words_arr.each do |color|
-      avail_colors << color unless House.exist?(color)
+
+
+  [$position_words_arr, $color_words_arr, $nationality_words_arr, $drink_words_arr, $smoke_words_arr, $pet_words_arr].each_with_index do |arr, idx|
+    attribute = $attributes[idx].to_s
+    define_method("available_" + attribute) do 
+      avail_attr = []
+      arr.each do |el|
+        avail_attr << el unless House.exist?(el)
+      end
+      avail_attr
     end
-    avail_colors
   end
 
-  def deduce_color
-    @final_ordered_houses.each do |house|
-      next if house.nil? # only try to deduce color if the house has some info
-      #maps color to boolean (e.g. yellow => false)
-      deduction_hash = {} 
+  #use meta-programming to reduce number of unique deduce methods
+  [:deduce_numbers, :deduce_colors, :deduce_nationalities, :deduce_drinks, :deduce_smokes, :deduce_pets].each_with_index do |method_name, idx|
+    attribute = $attributes[idx].to_s
+    define_method(method_name) do 
+      @final_ordered_houses.each do |house|
+        next if house.nil? # only try to deduce if the house has some info
 
-      if house.color.nil? #try to deduce color if house has no color
-        available_colors.each do |color|
-          house.color = color
-          p house, violates_relations?
+        #maps attr to boolean (e.g. yellow => false)
+        deduction_hash = {} 
 
-          deduction_hash[color] = violates_relations?
-          house.color = nil
+        if house.send(attribute).nil? #try to deduce attr (e.g. color) if house has no attr (e.g. color)
+          self.send("available_" + attribute).each do |el|
+            house.send(attribute + "=", el) # try the attr (e.g. color)
+
+            # record if it violates any relations
+            deduction_hash[el] = violates_relations?
+
+            house.send(attribute + "=", nil) # set back to nil
+          end
+        end
+
+        # check if only one key is false (meaning it is the only one that does not violate relations), if so, set the house attr (e.g. color) to that value
+        if deduction_hash.values.one? {|el| el == false}
+          house.send(attribute + "=", deduction_hash.key(false))
         end
       end
 
-      # check if only one key is false (meaning it is the only one that does not violate relations), if so, set the house color to that color
-      if deduction_hash.values.one? {|el| el == false}
-        house.color = deduction_hash.key(false)
-      end
     end
   end
+
+  # Keeping the original deduce_colors method here as a template, this method is essentially repeated many times to deduce all the different categories
+
+  # def available_color
+  #   avail_colors = []
+  #   $color_words_arr.each do |color|
+  #     avail_colors << color unless House.exist?(color)
+  #   end
+  #   avail_colors
+  # end
+
+  # def deduce_colors
+  #   @final_ordered_houses.each do |house|
+  #     next if house.nil? # only try to deduce color if the house has some info
+  #     #maps color to boolean (e.g. yellow => false)
+  #     deduction_hash = {} 
+
+  #     if house.color.nil? #try to deduce color if house has no color
+  #       available_colors.each do |color|
+  #         house.color = color
+  #         deduction_hash[color] = violates_relations?
+  #         house.color = nil
+  #       end
+  #     end
+
+  #     # check if only one key is false (meaning it is the only one that does not violate relations), if so, set the house color to that color
+  #     if deduction_hash.values.one? {|el| el == false}
+  #       house.color = deduction_hash.key(false)
+  #     end
+  #   end
+  # end
 
   def violates_relations?
     @final_ordered_houses.each do |house|
@@ -266,60 +315,96 @@ class Solution
     end
     false
   end
-end
 
-def violates_right_relations?
-  #loop through all right relations, in this case it is unecessary because there is only one, but it allows for a different problem with multiple right relations to be solved
-  @right_relations.each do |key, value|
+  def violates_right_relations?
+    #loop through all right relations, in this case it is unecessary because there is only one, but it allows for a different problem with multiple right relations to be solved
+    @right_relations.each do |key, value|
 
-    if House.exist?(key)
-      curr_house = House.find(key)
-      r_idx = @final_ordered_houses.index(curr_house)
+      if House.exist?(key)
+        curr_house = House.find(key)
+        r_idx = @final_ordered_houses.index(curr_house)
 
-      # true if "key" house (e.g green) is first
-      if curr_house.number == 'first'
-        return true
-      else
-        left_house = @final_ordered_houses[r_idx - 1] 
-        # return true unless the left house is nil or has the correct color
-        unless left_house.nil? || left_house.color == value
+        # true if "key" house (e.g green) is first
+        if curr_house.position == 'first'
           return true
+        else
+          left_house = @final_ordered_houses[r_idx - 1] 
+          # return true unless the left house is nil or has the correct color
+          unless left_house.nil? || left_house.color == value
+            return true
+          end
         end
       end
-    end
 
-    if House.exist?(value)
-      curr_house = House.find(value)
-      l_idx = @final_ordered_houses.index(curr_house)
+      if House.exist?(value)
+        curr_house = House.find(value)
+        l_idx = @final_ordered_houses.index(curr_house)
 
-      # true if "value" house (e.g. ivory) is last
-      if curr_house.number == 'last'
-        return true
-      else
-        right_house = @final_ordered_houses[l_idx + 1]
-        # return true unless the right house is nil or has the correct color
-        unless right_house.nil? || right_house.color == key
+        # true if "value" house (e.g. ivory) is last
+        if curr_house.position == 'last'
           return true
+        else
+          right_house = @final_ordered_houses[l_idx + 1]
+          # return true unless the right house is nil or has the correct color
+          unless right_house.nil? || right_house.color == key
+            return true
+          end
         end
+      end
+
+      # true if index of key house minus index of value house is greater than 1
+      if House.exist?(key) && House.exist?(value)
+        house_r = House.find(key)
+        house_l = House.find(value)
+        r_idx = @final_ordered_houses.index(house_r)
+        l_idx = @final_ordered_houses.index(house_l)
+        return true if r_idx - l_idx > 1
+      end
+
+    end
+    false
+  end
+
+  def deduce_from_pairing
+    @final_ordered_houses.each do |house|
+      next if house.nil?
+
+      unknown_attributes = []
+      $attributes.each do |attribute|
+        unknown_attributes << attribute if house.send(attribute).nil?
       end
       
-    end
-
-    # true if index of key house minus index of value house is greater than 1
-    if House.exist?(key) && House.exist?(value)
-      house_r = House.find(key)
-      house_l = House.find(value)
-      r_idx = @final_ordered_houses.index(house_r)
-      l_idx = @final_ordered_houses.index(house_l)
-      return true if r_idx - l_idx > 1
+      p unknown_attributes.length
+      unknown_attributes.each do |un_attr|
+        single_attr = find_single_attribute(un_attr)
+        p single_attr
+        if unknown_attributes.length % 2 == 1 && single_attr.length == 1
+          house.send(un_attr.to_s + "=", single_attr.first)
+        end
+      end
     end
   end
-  false
+
+  def find_single_attribute(attribute)
+    results = []
+    @next_relations.each do |key, value|
+      if $keywords_hash[key] == attribute && !House.exist?(key)
+        results << key
+      end
+      if $keywords_hash[value] == attribute && !House.exist?(value)
+        results << value
+      end
+    end
+    results
+  end
+
+
+
 end
 
 #script to run algorithm
 
-create_keywords_hash
+# create_keywords_hash
 
 s = Solution.new
 s.parse_puzzle_constraints
