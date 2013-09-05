@@ -145,16 +145,16 @@ class Solution
       end
     end
 
-    puts "simple_relations: #{@simple_relations}"
-    puts ""
-    puts "next_relations: #{@next_relations}"
-    puts ""
-    puts "right_relations: #{@right_relations}"
-    puts ""
-    puts "pos_relations: #{@pos_relations}"
-    puts ""
-    puts "no_relations: #{@no_relations}"
-    puts ""
+    # puts "simple_relations: #{@simple_relations}"
+    # puts ""
+    # puts "next_relations: #{@next_relations}"
+    # puts ""
+    # puts "right_relations: #{@right_relations}"
+    # puts ""
+    # puts "pos_relations: #{@pos_relations}"
+    # puts ""
+    # puts "no_relations: #{@no_relations}"
+    # puts ""
 
     [@simple_relations, @next_relations, @right_relations, @pos_relations]
   end
@@ -437,7 +437,6 @@ class Solution
       single_attr_arr << el if !House.exist?(el)
     end
 
-    p num_of_unknowns_arr
     # if only three houses have odd number unknowns and we have three single attributes
     num_of_unknowns_arr = num_of_unknowns_arr.map {|el| el % 2 == 1}
     if num_of_unknowns_arr.count(true) == 3 && single_attr_arr.length == 3
@@ -520,19 +519,12 @@ class Solution
     end
     results
   end
-
-
-
+  
 end
 
 #script to run algorithm
-
-# create_keywords_hash
 
 s = Solution.new
 s.parse_puzzle_constraints
 s.make_deductions
 s.render_solution
-
-# work on parsing the next and right relations
-# might have to iterate through random choices to continue with the algorithm
