@@ -88,7 +88,8 @@ end
 
 class Solution
   def initialize
-    @final_ordered_houses = Array.new(5)
+    @final_ordered_houses = Array.new(5) {|el| House.new}
+
   end
 
   def render_solution
@@ -166,18 +167,22 @@ class Solution
         @final_ordered_houses[0] = curr_house
       end
     end
+
+    @final_ordered_houses[1].position = "second"
+    @final_ordered_houses[3].position = "fourth"
+    @final_ordered_houses[4].position = "last"
   end
 
   def make_deductions
-    2.times do
+    4.times do
       create_from_pos_relations
       place_next_relations
       deduce_colors
       deduce_from_simple_relations
       deduce_drinks
       deduce_smokes
+      deduce_from_singling_and_pairing
     end
-    deduce_from_pairing
   end
 
   def place_next_relations
@@ -291,10 +296,10 @@ class Solution
         return true if violates_simple_relations?(keyword)
 
         #check if it violates next relations
-        return true if violates_right_relations?
+
 
         #check if it violates right relations
-
+        return true if violates_right_relations?
       end
     end
     false
@@ -365,7 +370,7 @@ class Solution
     false
   end
 
-  def deduce_from_pairing
+  def deduce_from_singling_and_pairing
     @final_ordered_houses.each do |house|
       next if house.nil?
 
@@ -375,13 +380,24 @@ class Solution
       end
       
       p unknown_attributes.length
-      unknown_attributes.each do |un_attr|
-        single_attr = find_single_attribute(un_attr)
-        p single_attr
-        if unknown_attributes.length % 2 == 1 && single_attr.length == 1
-          house.send(un_attr.to_s + "=", single_attr.first)
+      if unknown_attributes.length == 2
+        attr1 = unknown_attributes.first
+        attr2 = unknown_attributes.last
+        pair_attr = find_pair_attributes(attr1, attr2)
+        puts "paired: #{pair_attr}"
+        if pair_attr.length == 2
+          house.send(attr1.to_s + "=", pair_attr.first)
+          house.send(attr2.to_s + "=", pair_attr.last)
         end
       end
+
+      unknown_attributes.each do |un_attr|
+        single_attr = find_single_attribute(un_attr)
+        puts "single: #{single_attr}"
+        if (unknown_attributes.length == 3 || unknown_attributes.length == 1) && single_attr.length == 1
+          house.send(un_attr.to_s + "=", single_attr.first)
+        end
+      end   
     end
   end
 
@@ -393,6 +409,16 @@ class Solution
       end
       if $keywords_hash[value] == attribute && !House.exist?(value)
         results << value
+      end
+    end
+    results
+  end
+
+  def find_pair_attributes(attr1, attr2)
+    results = []
+    @simple_relations.each do |key, value|
+      if $keywords_hash[key] == attr1 && $keywords_hash[value] == attr2
+        results << key << value
       end
     end
     results
