@@ -138,20 +138,20 @@ class Solution
     [@simple_relations, @next_relations, @right_relations, @pos_relations]
   end
 
-  # def create_from_simple_relations #possibly unneeded 
-  #   @simple_relations.each do |key, value|
-  #     curr_house = House.find_or_create(key)
-  #     unless curr_house
-  #       curr_house = House.new
-  #       attribute = $keywords_hash[key].to_s
-  #       curr_house.send(attribute + "=", key)
-  #       @houses << curr_house
-  #     end
+  def deduce_from_simple_relations
+    @final_ordered_houses.each do |house|
+      next if house.nil? #nothing to deduce if there are no attributes
 
-  #     attribute = $keywords_hash[value].to_s
-  #     curr_house.send(attribute + "=", value)
-  #   end
-  # end
+      $attributes.each do |attribute|
+        key = house.send(attribute)
+        value = @simple_relations[key]
+        value_attr = $keywords_hash[value]
+        if value && house.send(value_attr).nil?
+          house.send(value_attr.to_s + "=", value)
+        end
+      end
+    end
+  end
 
   def create_from_pos_relations
     @pos_relations.each do |key, value|
@@ -173,6 +173,7 @@ class Solution
     create_from_pos_relations
     place_next_relations
     deduce_color
+    deduce_from_simple_relations
   end
 
   def place_next_relations
@@ -209,18 +210,23 @@ class Solution
   def deduce_color
     @final_ordered_houses.each do |house|
       next if house.nil? # only try to deduce color if the house has some info
-      bool_arr = []
+      #maps color to boolean (e.g. yellow => false)
+      deduction_hash = {} 
 
       if house.color.nil? #try to deduce color if house has no color
         available_colors.each do |color|
           house.color = color
           p house, violates_relations?
 
-          bool_arr << violates_relations?
+          deduction_hash[color] = violates_relations?
           house.color = nil
         end
       end
-      p bool_arr
+
+      # check if only one key is false (meaning it is the only one that does not violate relations), if so, set the house color to that color
+      if deduction_hash.values.one? {|el| el == false}
+        house.color = deduction_hash.key(false)
+      end
     end
   end
 
